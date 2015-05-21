@@ -1,0 +1,38 @@
+
+
+/// <summary>
+/// <br>We used "EntityFramework" to generate C# class files (.cs), the name of the file is Account.cs.</br>
+/// <br>We are not using the generated class which inherits from System.Data.Entity.DbContext.</br>
+/// <br>But we are using class Account.cs which is a C# class representation of table Account in database RPAD.</br>
+/// <br>Here are instructions on how we generated Account.cs:</br>
+/// <br>(1) right-click on Project Name in Visual Studio Solution Explorer-->Add-->New Item...-->Visual C# Items-->Data-->ADO .NET Entity Data Model--></br>
+/// <br>(2) type in textbox a model name (this class is also generated, it inherits from System.Data.Entity.DbContext, but we will not use it)-->click Add button--></br>
+/// <br>(3) click on Code First From Database-->click Next button--></br>
+/// <br>(4) on this screen make sure the database connection information is correct because EntityFramework needs to look at the correct database-->click Next button--></br>
+/// <br>(5) on this screen we selected the checkbox for the table called Account in database RPAD-->click Finish.</br>
+/// </summary>
+
+
+/// <summary>
+/// <br>We used "EntityFramework" to generate C# class files (.cs), the name of the file is AdminUser.cs.</br>
+/// <br>We are not using the generated class which inherits from System.Data.Entity.DbContext.</br>
+/// <br>But we are using class AdminUser.cs which is a C# class representation of table AdminUser in database RPAD.</br>
+/// <br>Here are instructions on how we generated AdminUser.cs:</br>
+/// <br>(1) right-click on Project Name in Visual Studio Solution Explorer-->Add-->New Item...-->Visual C# Items-->Data-->ADO .NET Entity Data Model--></br>
+/// <br>(2) type in textbox a model name (this class is also generated, it inherits from System.Data.Entity.DbContext, but we will not use it)-->click Add button--></br>
+/// <br>(3) click on Code First From Database-->click Next button--></br>
+/// <br>(4) on this screen make sure the database connection information is correct because EntityFramework needs to look at the correct database-->click Next button--></br>
+/// <br>(5) on this screen we selected the checkbox for the table called AdminUser in database RPAD-->click Finish.</br>
+/// </summary>
+
+/// <summary>
+/// <br>We used "EntityFramework" to generate C# class files (.cs), the name of the file is AccountTaxRecord.cs.</br>
+/// <br>We are not using the generated class which inherits from System.Data.Entity.DbContext.</br>
+/// <br>But we are using class AccountTaxRecord.cs which is a C# class representation of table AccountTaxRecord in database RPAD.</br>
+/// <br>Here are instructions on how we generated Account.cs:</br>
+/// <br>(1) right-click on Project Name in Visual Studio Solution Explorer-->Add-->New Item...-->Visual C# Items-->Data-->ADO .NET Entity Data Model--></br>
+/// <br>(2) type in textbox a model name (this class is also generated, it inherits from System.Data.Entity.DbContext, but we will not use it)-->click Add button--></br>
+/// <br>(3) click on Code First From Database-->click Next button--></br>
+/// <br>(4) on this screen make sure the database connection information is correct because EntityFramework needs to look at the correct database-->click Next button--></br>
+/// <br>(5) on this screen we selected the checkbox for the table called AccountTaxRecord in database RPAD-->click Finish.</br>
+/// </summary>

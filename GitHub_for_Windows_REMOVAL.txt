@@ -1,0 +1,3 @@
+C:\Users\blah\AppData\Local\GitHub
+C:\Users\blah\AppData\Roaming\GitHub
+C:\Users\blah\.gitconfig

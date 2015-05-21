@@ -1,0 +1,903 @@
+USE [RPAD]
+GO
+/****** Object:  StoredProcedure [dbo].[AdminUser_login]    Script Date: 4/21/2015 9:03:46 AM ******/
+SET ANSI_NULLS ON
+GO
+SET QUOTED_IDENTIFIER ON
+GO
+
+ALTER PROCEDURE [dbo].[AdminUser_login]
+	@UserName varchar(30)
+	,@UserPwd varchar(100)
+
+AS
+BEGIN
+	DECLARE @retval VARCHAR(30);
+	
+	SELECT @retval = UserName 
+		FROM AdminUser 
+		WHERE UserName = @UserName AND UserPwd = @UserPwd;
+
+	IF @retval IS NULL
+		RETURN 0;
+	ELSE
+		RETURN 1;
+END
+
+-------------------------------------------------------------------------------------------------------------
+
+USE [RPAD]
+GO
+/****** Object:  StoredProcedure [dbo].[AdminUser_updatePwd]    Script Date: 4/21/2015 9:03:24 AM ******/
+SET ANSI_NULLS ON
+GO
+SET QUOTED_IDENTIFIER ON
+GO
+ 
+ALTER PROCEDURE [dbo].[AdminUser_updatePwd]
+	 @UserName varchar(30)
+	,@oldPwd varchar(100)
+	,@newPwd varchar(100)
+ASBEGIN
+UPDATE AdminUser SET
+	 UserPwd = @newPwd
+WHERE UserName = @UserName AND UserPwd = @oldPwd;
+ 
+END
+
+----------------------------------------------------------------------------------------------------------------
+
+DECLARE @myreturn varchar(30);
+EXEC @myreturn = [dbo].[AdminUser_login] 'maxadmin','yyyzzz';
+PRINT @myreturn;
+
+SELECT * FROM [dbo].[AdminUser] ORDER BY UserID
+
+EXEC [dbo].[SP2C] AdminUser_login
+
+-----------------------------------------------------------------------------------------------------------------
+
+USE [RPAD]
+GO
+/****** Object:  StoredProcedure [dbo].[ss_GenView]    Script Date: 4/21/2015 9:43:01 AM ******/
+SET ANSI_NULLS ON
+GO
+SET QUOTED_IDENTIFIER ON
+GO
+
+ALTER PROCEDURE [dbo].[ss_GenView]
+	@objName VARCHAR(100) = 0
+AS
+
+	DECLARE @vname VARCHAR(100) = 'v' + @objName,
+			@colName VARCHAR(100),
+			@data_type VARCHAR(50), 
+			@c int = 0
+	
+	PRINT 'IF object_id(N''' + @vname +''', ''V'') IS NOT NULL'
+	PRINT CHAR(9) + 'DROP VIEW dbo.' + @vname
+	PRINT 'GO';
+
+	PRINT ' '
+
+	PRINT 'CREATE VIEW '+ @vname;
+	PRINT 'AS'
+	PRINT 'SELECT';
+	
+	DECLARE c CURSOR READ_ONLY FOR 
+		SELECT COLUMN_NAME, DATA_TYPE FROM ss_ObjData(@objName)
+	
+
+	OPEN c;
+	FETCH NEXT FROM c INTO @colName, @data_type;
+
+	WHILE(@@FETCH_STATUS = 0)
+	BEGIN
+		PRINT CHAR(9) + CASE WHEN @c > 0 THEN ',' ELSE ' ' END + @colName ;
+		
+		IF (@data_type = 'Datetime')
+		BEGIN
+			PRINT CHAR(9) + ',CONVERT(VARCHAR,'+ @colName + ',101) ' + @colName + 'Str' ;
+		END
+		
+		SELECT @c += 1;
+		FETCH NEXT FROM c INTO @colName, @data_type;
+	END
+	
+	PRINT 'FROM ' + @objName;
+	PRINT ' ';
+	PRINT '-- SELECT * FROM ' + @vname;
+
+	CLOSE c;
+	DEALLOCATE c;
+
+------------------------------------------------------------------------------------------------------------
+
+USE [RPAD]
+GO
+/****** Object:  StoredProcedure [dbo].[ss_GenSP]    Script Date: 4/21/2015 9:43:46 AM ******/
+SET ANSI_NULLS ON
+GO
+SET QUOTED_IDENTIFIER ON
+GO
+
+
+
+ALTER PROCEDURE [dbo].[ss_GenSP]
+	@objName VARCHAR(100) = 0,
+	@primaryKeyCol varchar(50),
+	@mode VARCHAR(20) = 'INSERT'
+AS
+SET NOCOUNT ON
+	DECLARE @t1  TABLE([--] varchar(100));
+	SELECT @mode = LOWER(@mode);
+
+	DECLARE @spname VARCHAR(100) = @objName +'_' + @mode,
+			@colName VARCHAR(100),
+			@data_type VARCHAR(50),
+			@isNullable VARCHAR(10),
+			@castAsStr VARCHAR(100), 
+			@c int = 0;
+	
+	PRINT 'IF EXISTS (SELECT * FROM INFORMATION_SCHEMA.ROUTINES' 
+    PRINT CHAR(9) + 'WHERE SPECIFIC_NAME = N''' + @spname + ''')' 
+	PRINT CHAR(9) + CHAR(9) + 'DROP PROCEDURE ' + @spname + ';'
+	PRINT 'GO'
+	PRINT ' '
+
+	DECLARE c CURSOR SCROLL FOR 
+		SELECT COLUMN_NAME, DATA_TYPEStr, IS_NULLABLE, CastAsStr FROM ss_ObjData(@objName)
+	OPEN c;
+	
+
+	PRINT 'CREATE PROCEDURE '+ @spname;
+	
+		SELECT @c = 0;
+		FETCH FIRST FROM c INTO @colName, @data_type, @isNullable, @castAsStr;
+		DECLARE @primaryKeyCol2 VARCHAR(50) = CASE @mode WHEN 'UPDATE' THEN 'junk' ELSE @primaryKeyCol END;
+		WHILE(@@FETCH_STATUS = 0)
+		BEGIN
+			if( @mode IN ('INSERT', 'UPDATE') )
+			BEGIN
+				IF(@colName != @primaryKeyCol2 AND @colName NOT IN('CreateDT', 'ModifyDT'))
+				BEGIN
+					PRINT CHAR(9) + CASE WHEN @c > 0 THEN ',' ELSE ' ' END + '@' + @colName + ' ' + @data_type
+						+ CASE WHEN @isNullable = 'YES' THEN ' = NULL' ELSE '' END;
+					SELECT @c += 1;
+				END
+			END
+			else if (@mode IN ('DELETE', 'REPORT'))
+			BEGIN
+				IF(@colName = @primaryKeyCol2 AND @colName NOT IN('CreateDT', 'ModifyDT') )
+					BEGIN
+						PRINT CHAR(9) + '@' + @colName + ' ' + @data_type
+					END
+			END
+
+			FETCH NEXT FROM c INTO @colName, @data_type, @isNullable, @castAsStr;
+		END
+	
+	
+	if (@mode IN ('DELETE'))
+	BEGIN
+		PRINT CHAR(9) + ',@softDelete bit = 1';
+	END
+	ELSE IF(@mode IN ('REPORT'))
+	BEGIN
+		PRINT CHAR(9) + ',@displayTitle bit = 1';
+	END;
+
+	PRINT 'AS' + CHAR(13) + 'BEGIN' + CHAR(13);
+	IF (@mode = 'INSERT')
+	BEGIN
+		FETCH FIRST FROM c INTO @colName, @data_type, @isNullable, @castAsStr;
+
+		PRINT 'DECLARE @newid int;';
+		PRINT ' ';
+		PRINT 'INSERT ' +  @objName + ' (';
+		SELECT @c = 0;
+		FETCH FIRST FROM c INTO @colName, @data_type, @isNullable, @castAsStr;
+		WHILE(@@FETCH_STATUS = 0)
+		BEGIN
+			IF(@colName != @primaryKeyCol )
+			BEGIN
+				PRINT CHAR(9) + CASE WHEN @c > 0 THEN ',' ELSE ' ' END + @colName  ;
+				SELECT @c += 1;
+			END;
+			FETCH NEXT FROM c INTO @colName, @data_type, @isNullable, @castAsStr;
+		END
+		PRINT ')'
+
+		PRINT 'VALUES ('
+		SELECT @c = 0;
+		FETCH FIRST FROM c INTO @colName, @data_type, @isNullable, @castAsStr;
+		WHILE(@@FETCH_STATUS = 0)
+		BEGIN
+			IF(@colName != @primaryKeyCol )
+			BEGIN
+				PRINT CHAR(9) + CASE WHEN @c > 0 THEN ',' ELSE ' ' END +
+				CASE WHEN  @colName IN ('ModifyDT', 'CreateDT') THEN 'GETDATE()' ELSE '@' + @colName END  ;
+				SELECT @c += 1;
+			END;
+			FETCH NEXT FROM c INTO @colName, @data_type, @isNullable, @castAsStr;
+		END
+		PRINT ');'
+	
+		PRINT 'SELECT @newid = @@IDENTITY;';
+		PRINT 'RETURN @newid;';
+	END
+	-------------------------------------------------------------------------------------------------------------------
+	ELSE IF( @mode = 'UPDATE')
+	BEGIN
+		FETCH FIRST FROM c INTO @colName, @data_type, @isNullable, @castAsStr;
+		SELECT @c = 0;
+		PRINT 'UPDATE ' +  @objName + ' SET';
+		WHILE(@@FETCH_STATUS = 0)
+		BEGIN
+			IF(@colName != @primaryKeyCol AND  @colName NOT IN ('CreateDT'))
+			BEGIN
+				PRINT CHAR(9) + CASE WHEN @c > 0 THEN ',' ELSE ' ' END + @colName  + ' = ' + 
+				CASE WHEN  @colName IN ('ModifyDT') THEN 'GETDATE()' ELSE '@' + @colName END ;
+				SELECT @c += 1;
+			END;
+			FETCH NEXT FROM c INTO @colName, @data_type, @isNullable, @castAsStr;
+		END
+		PRINT 'WHERE ' + @primaryKeyCol + ' = @' + @primaryKeyCol + ';' ;
+	END
+	-------------------------------------------------------------------------------------------------------------------
+	ELSE IF( @mode = 'DELETE')
+	BEGIN
+		
+		PRINT 'IF @softDelete = 0'
+		PRINT 'BEGIN';
+		PRINT	CHAR(9) + 'DELETE ' +  @objName + ' WHERE ' + @primaryKeyCol + ' = @' + @primaryKeyCol + ';' ;
+		PRINT 'END';
+		PRINT 'ELSE';
+		PRINT 'BEGIN';
+		PRINT	CHAR(9) + 'UPDATE ' +  @objName + ' SET ActiveFl = 0' + ' WHERE ' + @primaryKeyCol + ' = @' + @primaryKeyCol + ';' ;
+		PRINT 'END';
+
+	END
+	-------------------------------------------------------------------------------------------------------------------
+	ELSE IF( @mode = 'REPORT')
+	BEGIN
+		DECLARE @maxNameLen smallint = 0;
+		DECLARE @fetchList varchar(MAX) ='';
+		FETCH FIRST FROM c INTO @colName, @data_type, @isNullable, @castAsStr;
+		WHILE(@@FETCH_STATUS = 0)
+		BEGIN
+			IF (LEN(@colName) > @maxNameLen ) 
+			BEGIN
+				SELECT @maxNameLen = LEN(@colName);
+			END;
+
+			SELECT @fetchList += '@' + @colName + ',';
+
+			FETCH NEXT FROM c INTO @colName, @data_type, @isNullable, @castAsStr;
+		END
+
+		
+
+		SELECT @fetchList = ' FROM c INTO ' + LEFT(@fetchList, LEN(@fetchList)-1) + ';';
+
+		PRINT 'IF (@displayTitle = 1) EXEC ReportHeader ' + @spname  + ',1,1;'; 
+		PRINT CHAR(9) + 'DECLARE @count smallint = 1';
+		PRINT CHAR(9) + 'SET NOCOUNT ON;';
+		
+		FETCH FIRST FROM c INTO @colName, @data_type, @isNullable, @castAsStr;
+		-- DECLARE
+		WHILE(@@FETCH_STATUS = 0)
+		BEGIN
+			IF(@colName != @primaryKeyCol)
+			BEGIN
+				PRINT CHAR(9) + 'DECLARE ' + '@' + @colName + ' ' + @data_type + ';';
+			END;
+			FETCH NEXT FROM c INTO @colName, @data_type, @isNullable, @castAsStr;
+		END
+		PRINT '';
+
+		-- CURSOR
+		PRINT 'DECLARE c CURSOR SCROLL FOR SELECT'
+		FETCH FIRST FROM c INTO @colName, @data_type, @isNullable, @castAsStr;
+		SELECT @c = 0;
+		WHILE(@@FETCH_STATUS = 0)
+		BEGIN
+			PRINT CHAR(9) + CASE WHEN @c > 0 THEN ',' ELSE ' ' END  + @colName ;
+			SELECT @c += 1;
+			FETCH NEXT FROM c INTO @colName, @data_type, @isNullable, @castAsStr;
+		END
+		PRINT 'FROM ' + @objName + ' WHERE ' + @primaryKeyCol + ' = @' +@primaryKeyCol  +  ';'
+		PRINT '';
+		PRINT 'OPEN c;';
+		PRINT 'FETCH FIRST ' + @fetchList;
+		PRINT '';
+		-- REPORT LOOP
+		PRINT 'WHILE(@@FETCH_STATUS = 0)';
+		PRINT 'BEGIN';
+		PRINT 'PRINT ''-------------------------  Record # '' + CAST(@count AS VARCHAR(4)) + ''----------------------------------'';';                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  
+		--PRINT 'SELECT dbo.ReportBlankLine();';
+		FETCH FIRST FROM c INTO @colName, @data_type, @isNullable, @castAsStr;
+		WHILE(@@FETCH_STATUS = 0)
+		BEGIN
+			SELECT @c = (@maxNameLen + 5);
+			
+			PRINT CHAR(9) + 'PRINT ''' + dbo.ReportItemTitle(@colName, @c, 1) + ''' + ' + @castAsStr + ';' ;
+			FETCH NEXT FROM c INTO @colName, @data_type, @isNullable, @castAsStr;
+		END
+		PRINT 'SELECT @count+= 1;';
+		PRINT 'FETCH NEXT ' + @fetchList;
+		PRINT 'END'
+		PRINT 'IF @count > 1 BEGIN PRINT ''-------------------------------------------------------------''; PRINT ''''END;';
+		PRINT '';
+		PRINT 'CLOSE c;';
+		PRINT 'DEALLOCATE c;';
+	END
+
+	PRINT ''; 
+		PRINT 'END'
+		PRINT 'GO'
+		PRINT '-------------------------------------------------------------------------------'	
+	CLOSE c;
+	DEALLOCATE c;
+
+
+
+
+
+-------------------------------------------------------------------------------------------------------------------
+
+USE [RPAD]
+GO
+/****** Object:  StoredProcedure [dbo].[SP2C]    Script Date: 4/21/2015 9:44:51 AM ******/
+SET ANSI_NULLS ON
+GO
+SET QUOTED_IDENTIFIER ON
+GO
+
+ALTER PROCEDURE [dbo].[SP2C]
+	@sp_name varchar(100) = 0
+AS
+BEGIN
+
+	DECLARE c CURSOR FOR
+		SELECT 
+		PARAMETER_NAME,
+		DATA_TYPE,
+		CAST(CHARACTER_MAXIMUM_LENGTH AS varchar(10)),
+		DbType
+	FROM 
+		INFORMATION_SCHEMA.PARAMETERS t 
+	RIGHT OUTER JOIN 
+		SSParamBuilder s 
+	ON t.DATA_TYPE = s.t
+	WHERE 
+		SPECIFIC_NAME = @sp_name
+
+OPEN c
+
+DECLARE @p nvarchar(128) , @dt nvarchar(128),	@size varchar(10),
+		@row_count smallint, @newt	varchar(100) , @pname varchar(100)
+
+FETCH NEXT FROM c INTO @p, @dt, @size, @newt
+
+SELECT @row_count = 1
+WHILE @@FETCH_STATUS = 0 
+BEGIN
+
+IF( 1 = 1)
+BEGIN
+	IF @row_count = 1 
+	BEGIN
+		PRINT 'using (DBMgr db = new DBMgr(connectionString))'
+        PRINT '{'
+            PRINT CHAR(9) +  'SqlConnection cnn = null;'
+            PRINT CHAR(9) + 'SqlCommand c = null;'
+            PRINT CHAR(9) + 'try'
+            PRINT CHAR(9) + '{'
+                PRINT CHAR(9) +  CHAR(9) + 'cnn = new SqlConnection(connectionString);'
+		PRINT CHAR(9) + CHAR(9) + 'c = new SqlCommand("' + @sp_name + '", cnn);'
+		PRINT CHAR(9) + CHAR(9) + 'c.CommandType = CommandType.StoredProcedure;'
+	END
+	
+SELECT @pname = 'p' + CAST( @row_count AS varchar(10))
+	PRINT CHAR(9) + CHAR(9) + 'SqlParameter ' + @pname + 
+			' = c.Parameters.Add("' + @p + '", SqlDbType.' + @newt+ ');'
+    PRINT CHAR(9) + CHAR(9) + @pname + '.Value = _' + REPLACE(@p, '@', '')+ ';'
+
+
+--PRINT @p + '=' + @p
+END
+
+--PRINT 'string ' + @p + ','
+	FETCH NEXT FROM c INTO @p, @dt, @size, @newt
+	SELECT @row_count = @row_count + 1
+END
+
+PRINT ''
+PRINT CHAR(9) + CHAR(9) + 'cnn.Open();'
+PRINT CHAR(9) + CHAR(9) + 'c.ExecuteNonQuery();'
+PRINT CHAR(9) + '}'
+PRINT CHAR(9) + 'catch (Exception ex) { throw ex;}'
+PRINT CHAR(9) + 'finally'
+PRINT CHAR(9) + '{'
+PRINT CHAR(9) + CHAR(9) + 'if (c != null) {c.Dispose();}'
+PRINT CHAR(9) + CHAR(9) + 'if (cnn != null) {c.Dispose();}'
+PRINT CHAR(9) + '}'
+PRINT '}'
+
+CLOSE c
+DEALLOCATE c
+END
+
+----------------------------------------------------------------------------------------------------
+
+USE [RPAD]
+GO
+/****** Object:  StoredProcedure [dbo].[ss_VarDump]    Script Date: 4/21/2015 9:46:44 AM ******/
+SET ANSI_NULLS ON
+GO
+SET QUOTED_IDENTIFIER ON
+GO
+
+ALTER PROCEDURE [dbo].[ss_VarDump]
+	@VarGroupName varchar(100) = NULL
+	,@CompanyID int = NULL
+	,@printable bit = 0
+AS
+
+DECLARE @title varchar(40) = 'Var Group Report : ' + @VarGroupName;
+EXEC ReportHeader @title, 2;
+SET NOCOUNT ON
+IF( @VarGroupName IS NULL)
+BEGIN
+	select * FROM VarGroup;
+END
+ELSE
+BEGIN
+	SET NOCOUNT OFF;
+
+	IF(@printable = 0 )
+	BEGIN
+		select * FROM VarGroup WHERE VarGroupName = @VarGroupName;
+		
+		SELECT 
+		VarGroupName, 
+		UIOrder, RankValue, CAST(VarName AS varchar(40)) VarName, VarValue,VarValue2,VarValue3,IsDefault, IsSelectable FROM VarDef 
+		WHERE VarGroupName = @VarGroupName order by UIOrder;
+	END;
+	ELSE
+	BEGIN
+		SELECT  
+			UIOrder, RankValue, CAST(VarName AS varchar(40)) VarName, 
+			CAST(VarValue AS varchar(40))VarValue,
+			IsSelectable 
+		FROM 
+			VarDef 
+		WHERE 
+			VarGroupName = @VarGroupName order by UIOrder;
+		
+	END;
+END;
+
+------------------------------------------------------------------------------
+
+USE [RPAD]
+GO
+/****** Object:  StoredProcedure [dbo].[ss_VarGroupDelete]    Script Date: 4/21/2015 9:47:32 AM ******/
+SET ANSI_NULLS ON
+GO
+SET QUOTED_IDENTIFIER ON
+GO
+
+ALTER PROCEDURE [dbo].[ss_VarGroupDelete]
+	@srcName varchar(20)
+AS
+BEGIN
+
+	SET NOCOUNT ON;
+
+	IF NOT EXISTS(SELECT * FROM VarGroup WHERE VarGroupName = @srcName)
+	BEGIN
+		PRINT 'ERROR >> Can''t find Source Group = ' + @srcName;
+		RETURN;  
+	END
+	ELSE
+	BEGIN
+		BEGIN TRY
+			BEGIN TRANSACTION
+				DELETE VarDef WHERE VarGroupName = @srcName;
+				DELETE VarGroup WHERE VarGroupName = @srcName;
+				PRINT 'Group ' + @srcName + ' has been deleted.';
+			COMMIT;
+		END TRY
+		BEGIN CATCH
+			ROLLBACK;
+		END CATCH;
+	END;
+END;
+
+------------------------------------------------------------------------
+
+USE [RPAD]
+GO
+/****** Object:  StoredProcedure [dbo].[ss_VarGroupMove]    Script Date: 4/21/2015 9:47:56 AM ******/
+SET ANSI_NULLS ON
+GO
+SET QUOTED_IDENTIFIER ON
+GO
+
+ALTER PROCEDURE [dbo].[ss_VarGroupMove]
+	@srcName varchar(20), 
+	@tgtName varchar(20)
+AS
+BEGIN
+
+	SET NOCOUNT ON;
+
+	IF NOT EXISTS(SELECT * FROM VarGroup WHERE VarGroupName = @srcName)
+	BEGIN
+		PRINT 'ERROR >> Can''t find Source Group = ' + @srcName;
+		RETURN;  
+	END
+	ELSE IF EXISTS(SELECT * FROM VarGroup WHERE VarGroupName = @tgtName)
+	BEGIN
+		PRINT 'ERROR >> Target Group already exists = ' + @tgtName;
+		EXEC ss_VarDump @tgtName;
+		RETURN; 
+	END
+	ELSE
+	BEGIN
+		BEGIN TRY
+			BEGIN TRANSACTION
+				INSERT VarGroup (VarGroupName, VarGroupDesc, CreateDT, ModifyDT, ModifyBy, [Version], ActiveDT, InActiveDT,  EditLevel)
+					SELECT @tgtName, VarGroupDesc, CreateDT, ModifyDT, ModifyBy, [Version], ActiveDT, InActiveDT, EditLevel 
+					FROM VarGroup 
+					WHERE VarGroupName = @srcName;
+					
+				UPDATE VarDef SET VarGroupName = @tgtName WHERE VarGroupName = @srcName;
+				
+				DELETE VarGroup WHERE VarGroupName = @srcName;
+			COMMIT;
+		END TRY
+		BEGIN CATCH
+			ROLLBACK;
+		END CATCH;
+	END;
+END;
+
+
+-------------------------------------------------------------------------------
+
+USE [RPAD]
+GO
+/****** Object:  StoredProcedure [dbo].[ss_VarGroupReplace]    Script Date: 4/21/2015 9:48:15 AM ******/
+SET ANSI_NULLS ON
+GO
+SET QUOTED_IDENTIFIER ON
+GO
+
+ALTER PROCEDURE [dbo].[ss_VarGroupReplace]
+	@srcName varchar(20), 
+	@tgtName varchar(20)
+AS
+BEGIN
+
+	SET NOCOUNT ON;
+	
+	IF NOT EXISTS(SELECT * FROM VarGroup WHERE VarGroupName = @srcName)
+	BEGIN
+		PRINT 'ERROR >> Can''t find Source Group = ' + @srcName;
+		RETURN;  
+	END
+	ELSE IF EXISTS(SELECT * FROM VarGroup WHERE VarGroupName = @tgtName)
+	BEGIN
+		PRINT 'ERROR >> Target Group already exists = ' + @tgtName;
+		EXEC ss_VarDump @tgtName;
+		RETURN; 
+	END
+	ELSE
+	BEGIN
+		BEGIN TRY
+			BEGIN TRANSACTION
+				
+			DELETE VarDef WHERE VarGroupName = @tgtName;
+
+			INSERT VarDef(
+				VarGroupName, 
+				CompanyID, 
+				VarName, 
+				VarValue, 
+				VarValue2, 
+				VarDesc, 
+				UIOrder, 
+				RankValue, 
+				CreateDT, 
+				ModifyDT, 
+				ModifyBy, 
+				ActiveDT, 
+				InActiveDT, 
+				databaseName, 
+				objectName, 
+				columnName, 
+				VarValue3, 
+				propertyName
+			)
+			SELECT 
+				@tgtName, 
+				CompanyID, 
+				VarName, 
+				VarValue, 
+				VarValue2, 
+				VarDesc, 
+				UIOrder, 
+				RankValue, 
+				CreateDT, 
+				ModifyDT, 
+				ModifyBy, 
+				ActiveDT, 
+				InActiveDT, 
+				databaseName, 
+				objectName, 
+				columnName, 
+				VarValue3, 
+				propertyName
+			FROM 
+			VarDef WHERE VarGroupName = @srcName;
+
+			COMMIT;
+		END TRY
+		BEGIN CATCH
+			ROLLBACK;
+		END CATCH;
+	END;
+END;
+
+----------------------------------------------------------------
+
+USE [RPAD]
+GO
+/****** Object:  StoredProcedure [dbo].[util_VarGroupSummary]    Script Date: 4/21/2015 9:48:36 AM ******/
+SET ANSI_NULLS ON
+GO
+SET QUOTED_IDENTIFIER ON
+GO
+
+ALTER PROCEDURE [dbo].[util_VarGroupSummary]
+	@companyID int = 1, 
+	@varGroupName varchar(20) = '%'
+AS
+
+DECLARE c CURSOR FOR 
+	SELECT VarGroupName FROM VarGroup WHERE VarGroupName LIKE UPPER(@varGroupName)
+	ORDER BY VarGroupName;
+OPEN c;
+
+DECLARE @curGroup varchar(20);
+FETCH NEXT FROM c INTO @curGroup;
+
+SET NOCOUNT ON;
+WHILE(@@FETCH_STATUS = 0)
+BEGIN
+	EXEC ss_VarDump @curGroup, @companyID;
+	FETCH NEXT FROM c INTO @curGroup;
+END;
+	
+CLOSE c;
+DEALLOCATE c;
+
+---------------------------------------------------------------------------------
+
+USE [RPAD]
+GO
+/****** Object:  UserDefinedFunction [dbo].[VarDefRecord]    Script Date: 4/21/2015 9:48:59 AM ******/
+SET ANSI_NULLS ON
+GO
+SET QUOTED_IDENTIFIER ON
+GO
+
+ALTER FUNCTION [dbo].[VarDefRecord](@VarGroupName varchar(20), @VarValue varchar(20))
+RETURNS TABLE
+AS RETURN
+(
+	SELECT * FROM VarDef WHERE VarGroupName = UPPER(@varGroupName) AND UPPER(VarValue) = UPPER(RTRIM(LTRIM(@VarValue)))
+)
+
+
+------------------------------------------------------------------------------------
+
+USE [RPAD]
+GO
+/****** Object:  UserDefinedFunction [dbo].[VarDefValues]    Script Date: 4/21/2015 9:49:21 AM ******/
+SET ANSI_NULLS ON
+GO
+SET QUOTED_IDENTIFIER ON
+GO
+ALTER FUNCTION [dbo].[VarDefValues](@VarGroupName varchar(20), @VarValue varchar(20))
+RETURNS TABLE
+AS
+RETURN
+(
+	SELECT * FROM VarDef WHERE VarGroupName = @VarGroupName AND UPPER(VarValue) = UPPER(RTRIM(LTRIM(@VarValue)))
+)
+
+
+--------------------------------------------------------------------------------------
+
+USE [RPAD]
+GO
+/****** Object:  UserDefinedFunction [dbo].[VarValueString]    Script Date: 4/21/2015 9:49:47 AM ******/
+SET ANSI_NULLS ON
+GO
+SET QUOTED_IDENTIFIER ON
+GO
+
+ALTER FUNCTION [dbo].[VarValueString] (@VarGroupName varchar(20), @VarValue varchar(20))
+RETURNS varchar(100)
+WITH EXECUTE AS CALLER
+AS
+BEGIN
+	DECLARE @s varchar(100)
+	SELECT @s = VarDesc FROM VarDef WHERE VarGroupName = UPPER(@varGroupName) AND UPPER(VarValue) = UPPER(RTRIM(LTRIM(@VarValue)))
+     RETURN ISNULL(@s, 'ERROR')
+END
+
+-------------------------------------------------------------------------------------------
+
+USE [RPAD]
+GO
+/****** Object:  UserDefinedFunction [dbo].[util_CountryCode2ToName]    Script Date: 4/21/2015 9:50:24 AM ******/
+SET ANSI_NULLS ON
+GO
+SET QUOTED_IDENTIFIER ON
+GO
+
+ALTER FUNCTION [dbo].[util_CountryCode2ToName] (@countryCode2 varchar(2))
+RETURNS varchar(100)
+WITH EXECUTE AS CALLER
+AS
+-- place the body of the function here
+BEGIN
+	DECLARE @retval VARCHAR(100);
+	
+	SELECT @retval = CountryName 
+		FROM util_CountryDef 
+		WHERE CountryCode2 = @countryCode2;
+
+	RETURN ISNULL(@retval,'');
+END
+
+----------------------------------------------------------------------------------------------
+
+USE [RPAD]
+GO
+
+/****** Object:  View [dbo].[v_CountryDropdownList]    Script Date: 4/21/2015 9:51:23 AM ******/
+SET ANSI_NULLS ON
+GO
+
+SET QUOTED_IDENTIFIER ON
+GO
+
+CREATE VIEW [dbo].[v_CountryDropdownList]
+AS
+  SELECT TOP 500 [CountryName]
+		,[CountryCode2] CountryCode
+		,ISNULL([PostalCodeFormat], '') [PlaceholderValue]
+		,ISNULL([PostalCodeRegex], '') [PatternValue]
+		,[ISDefault]
+  FROM [dbo].[util_CountryDef]
+  WHERE ActiveFlag = 1
+  ORDER BY IsDefault DESC, CountryName
+GO
+
+
+--------------------------------------------------------------------------------------------------
+
+USE [RPAD]
+GO
+
+/****** Object:  View [dbo].[vAccount]    Script Date: 4/21/2015 9:51:50 AM ******/
+SET ANSI_NULLS ON
+GO
+
+SET QUOTED_IDENTIFIER ON
+GO
+
+
+ 
+CREATE VIEW [dbo].[vAccount]
+AS
+SELECT
+	 AccountID
+	,LoginName
+	,Pwd
+	,NamePrefix
+	,NameFirst
+	,NameMiddle
+	,NameLast
+	,NameTitle
+	,NameLast AS FullName
+	--,SSN4
+	--,SSN
+	--,DOB
+	--,CONVERT(VARCHAR,Convert(DATE, DOB),101) DOBstr
+	--,LicenseNumber
+	,Addr1
+	,Addr2
+	,AddrCity
+	,AddrStateCode
+	,AddrStateText
+	,AddrCountryCode2
+	,AddrPostalCode
+	,DaytimePhone
+	,EveningPhone
+	,dbo.util_Phone2Str(DaytimePhone) DaytimePhoneStr
+	,dbo.util_Phone2Str(EveningPhone) EveningPhoneStr
+	,EmailAlternate
+--	,CreateDT
+	,CONVERT(VARCHAR,CreateDT,101) CreateDTStr
+	,ApprovalStatus
+--	,ModifyDT
+	,CONVERT(VARCHAR,ModifyDT,101) ModifyDTStr
+	--,ActivationCode
+	--,ActivationSendDT
+	,CONVERT(VARCHAR,ActivationSendDT,101) ActivationSendDTStr
+	--,ActivationDT
+	,CONVERT(VARCHAR,ActivationDT,101) ActivationDTStr
+	,ActiveFl
+	,LockFl
+--	,LastLoginDT
+	,CONVERT(VARCHAR,LastLoginDT,101) LastLoginDTStr
+	,Notes
+	--,StateTemp
+	--,legacyID
+	--,legacyLoginName
+FROM Account
+ 
+-- SELECT * FROM vAccount
+
+
+
+GO
+
+
+---------------------------------------------------------------
+USE [RPAD]
+GO
+
+/****** Object:  View [dbo].[vAdminUser]    Script Date: 4/21/2015 9:52:21 AM ******/
+SET ANSI_NULLS ON
+GO
+
+SET QUOTED_IDENTIFIER ON
+GO
+
+CREATE VIEW [dbo].[vAdminUser]
+AS
+SELECT
+	 UserID
+	,UserName
+	,UserPwd
+	,FirstName
+	,LastName
+	,Phone
+	,dbo.util_Phone2Str(Phone) PhoneStr
+	,Title
+	,MailingAddress
+	,EmailAddress
+	,UserRole
+	,ActiveFl
+	,CreateDT
+	,CONVERT(VARCHAR,CreateDT,101) CreateDTStr
+	,ModifyDT
+	,CONVERT(VARCHAR,ModifyDT,101) ModifyDTStr
+	,LockFl
+	,LastLoginDT
+	,CONVERT(VARCHAR,LastLoginDT,101) LastLoginDTStr
+	,LoginCount
+FROM AdminUser
+GO
+
+
+
+
