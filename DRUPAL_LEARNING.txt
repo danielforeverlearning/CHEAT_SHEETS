@@ -1,0 +1,37 @@
+database.inc
+line 2153 public function execute($args = array(), $options = array())
+line 2171 before call to
+$return = parent::execute($args);
+
+ok.....
+inside debugger Variables window
+$this->queryString holds the queryString
+$args holds the values that go into the above queryString
+
+for example:
+$this->queryString = SELECT source,alias FROM url_alias 
+                     WHERE source IN (:system_0, :system_1, :system_2)
+					 AND language IN (:language, :language_none)
+					 ORDER BY language ASC, pid ASC
+					 
+$args = Array[5]
+        :language      = "en"
+		:language_none = "und"
+		:system_0      = "node/60"
+		:system_1      = "node/77"
+		:system_2      = "node/81"
+		
+THEREFORE THE FINAL QUERY STRING IS............
+
+SELECT source,alias FROM url_alias
+WHERE source IN (node/60, node/77, node/81)
+AND language IN (en, und)
+ORDER BY language ASC, pid ASC
+
+
+inside phpmyadmin
+SELECT * FROM `url_alias` WHERE `source` = 'node/60'
+
+SELECT * FROM `url_alias` WHERE `source` IN ('node/60',  'node/77', 'node/81')
+AND `language` IN ('en', 'und')
+

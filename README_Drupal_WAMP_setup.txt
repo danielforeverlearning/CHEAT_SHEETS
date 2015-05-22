@@ -58,6 +58,8 @@ C:\wamp\bin\apache\Apache2.2.11\conf\httpd.conf
 
 # Virtual hosts
 Include conf/extra/httpd-vhosts.conf
+
+LoadModule rewrite_module modules/mod_rewrite.so
 ******************************************************************************
 
 
@@ -125,6 +127,8 @@ C:\wamp\bin\apache\apache2.4.9\conf\extra\httpd-vhosts.conf
 
 
 **********************************************************************
-(5) ipconfig /flushdns
-(6) restart wamp all services
+(5) .htaccess file was missing from github because of the .gitignore told it to ignore,
+but we need it
+(6) ipconfig /flushdns
+(7) restart wamp all services
 **********************************************************************

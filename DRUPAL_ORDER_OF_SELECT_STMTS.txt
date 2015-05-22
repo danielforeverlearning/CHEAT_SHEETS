@@ -1,0 +1,12 @@
+
+(1)
+SELECT source,alias FROM url_alias
+WHERE source IN (node/60, node/77, node/81)
+AND language IN (en, und)
+ORDER BY language ASC, pid ASC
+
+(2)
+SELECT b.*\nFROM \nblock b\nWHERE  (b.theme = :db_condition_placeholder_0) AND (b.status = :db_condition_placeholder_1) \nORDER BY b.region ASC, b.weight ASC, b.module ASC
+:db_condition_placeholder_0 = servco
+:db_condition_placeholder_1 = 1
+
