@@ -1,0 +1,5 @@
+name = Current Posts MODULE_maxstillstudying
+description = A block module that lists links to recent posts COW.
+core = 7.x
+
+configure = admin/config/content/current_posts
