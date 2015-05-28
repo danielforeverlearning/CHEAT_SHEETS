@@ -1,0 +1,102 @@
+function Get_Input_Value2Session($sub_model_id,$overCopy,$disc)
+{
+    $Sub_Model_Info = get_sub_model_info_byId($sub_model_id);
+    $input = null;
+    $url = $_SERVER['HTTP_REFERER'];
+    $flag = strpos($url, "step2", 0);
+    if ($flag) {
+        $input = $_SESSION["step2"];
+    }
+    $Destination = Get_Model_Destination($sub_model_id);
+//    var_dump($input["trans_price"]);
+    $inputValue = array(
+        "Name" => $Sub_Model_Info["Name"] . "&nbsp;" . $Sub_Model_Info["Sub_Model_Name"],
+        "OnlyName" => $Sub_Model_Info["Name"],
+        "Total" => "$" . number_format($Sub_Model_Info["Starting_MSRP"] + $input["engine_price"] + $input["trans_price"] + $input["exterior_price"] + $input["interior_price"] + $input["package_price"] + $Destination + $input["config_price"]),
+        "Engine" => $input["engine_name"],
+        "transmissionsName" => $input["engine"],
+        "Summary" => $Sub_Model_Info["Year"] . "&nbsp;" . $Sub_Model_Info["Name"] . "&nbsp;" . $Sub_Model_Info["Sub_Model_Name"],
+        "ModelPrice" => "$" . number_format($Sub_Model_Info["Starting_MSRP"]),
+        "Trims" => array(
+            "Name" => "" . $input["engine_name"],
+            "price" => GetFormatPrice($input["engine_price"])
+
+        ),
+        "Transmission" => array(
+            "Name" => "" . $input["engine"],
+            "price" => GetFormatPrice($input["trans_price"])
+        ),
+        "Colors" => array(
+            array(
+                "Id" => $input["exterior_id"],
+                "Name" => "Exterior Color: " . $input["exterior_name"],
+                "Price" => "$" . number_format($input["exterior_price"])
+            ),
+            array(
+                "Id" => $input["interior_id"],
+                "Name" => "Interior Color: " . $input["interior_name"],
+                "Price" => "$" . number_format($input["interior_price"])
+            )
+        ),
+        "oId" => $input["oId"],
+        "package_details" => $input["package_details"],
+        "Packages" => array(
+            "Name" => @strlen($input["package_name"]) == 0 ? '' : 'Package "' . $input["package_name"] . '"',
+            "Price" => GetFormatPrice($input["package_price"]),
+        ),
+        "combination" => Get_Combination_Name($input),
+        "combinationPrice" => GetFormatPrice($input["config_price"]),
+        "MPG" => $input["model_mpg"],
+        "Other" => array(),
+        "Url" => Util::uri2urlbyConstant(default_149_94, $Sub_Model_Info["Sub_model_Img"]),
+        'exterior_id' => $input["exterior_id"],
+        'Model' => $Sub_Model_Info["Name"],
+        'Year' => $Sub_Model_Info["Year"],
+        'Color' => $input["exterior_name"],
+        'Destination' => GetFormatPrice($Destination),
+        'overCopy' => Util::Dprint($overCopy),
+        'desc' => Util::Dprint($disc),
+        'first360Img' => "",
+        'back_url' => $url,
+    );
+    $_SESSION["step3"] = $inputValue;
+
+
+    //writing test code to dump out a text file to see session variables
+    //i noticed sometimes variable $inputValue["Model"] contained illegal characters for a valid file name in windows, characters such as '<' or '>', so i am going to strip them out
+    /*********************************************
+    $patarray = array("/<i>/", "/<\/i>/");
+    $repair_model_name = preg_replace($patarray, "", $inputValue["Model"]);
+    $myfilename = sprintf("DUMP_%s_%s_%s_%s.txt", $inputValue["Year"], $repair_model_name, $sub_model_id, $inputValue["oId"]);
+    $fp = fopen($myfilename, "w");
+    fprintf($fp, "sub_model_id = %s\n", $sub_model_id);
+    fprintf($fp, "model_year = %s\n", $Sub_Model_Info["Year"]);
+    fprintf($fp, "model_name = %s\n", $Sub_Model_Info["Name"]);
+    fprintf($fp, "sub_model_name = %s\n", $Sub_Model_Info["Sub_Model_Name"]);
+    $mytextdump = var_export($inputValue, true);
+    fprintf($fp, "%s\n", $mytextdump);
+    fclose($fp);
+    ***********************************************/
+
+    //writing test code to save data to MySQL database table
+    $servername = "localhost";
+    $username   = "root";
+    $password   = "";
+    $dbname     = "vehicle_analytics";
+    $conn = new mysqli($servername, $username, $password, $dbname);
+    if ($conn->connect_error)
+    {
+		//maybe instead of die, you can dump some text to a log file or error log or something like that
+		die("Connection failed: " . $conn->connect_error);
+    } 
+    $sql = sprintf("INSERT INTO step3_data (model_year, model_name, sub_model_name, combination, engine, transmission, color_exterior, color_interior, package) VALUES ('%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s')",
+                   $Sub_Model_Info["Year"], $repair_model_name, $Sub_Model_Info["Sub_Model_Name"], $inputValue["combination"], $inputValue["Engine"], $inputValue["transmissionsName"], $inputValue["Colors"][0]["Name"], $inputValue["Colors"][1]["Name"], $inputValue["Packages"]["Name"]);
+    if ($conn->query($sql) === FALSE)
+    {
+		//maybe instead of die, you can dump some text to a log file or error log or something like that
+		die("Connection failed: " . $conn->error);
+    }
+    $conn->close();
+	
+    return $inputValue;
+}//Get_Input_Value2Session
