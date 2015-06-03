@@ -1,0 +1,18 @@
+(1) ok whether u use chrome or i.e. it works
+and when you click "view certificates" in i.e.
+or  when you click "Certificate information" in chrome
+it pops up the same dialog, so they are using the same "thing".
+
+
+
+
+
+
+Q: "The personal certificate can't be installed because you do not own the corresponding private key which was created when the certificate was requested" 
+
+A: You first created the certificate with the first browser. That browser created the private key, and stored it hidden in the browser-profile. When you then got the certificate, it was merged with the private key, and made useable that way. (You might have seen a popup window saying "Generating Private Key": That was your browser when it generated the key) Afterwards you used a different browser (or a different user-profile, or a different computer, or you have deleted your profile in the mean time, formatted your harddisk or anything else like that), and tried to download the certificate again, but you don´t have the matching private key for the certificate, so your browser tells that you that the certificate isn´t of much use without the private key. 
+
+Unfortunately, Firefox completely hides the private keys, you can´t see them anywhere in the settings. (Opera on the other hand shows the private keys. So feel free to send a feature-request to Firefox to add the feature of showing the private keys) 
+
+So what you have to do: You have to backup/export the certificate+private key from the first browser/profile into a PKCS#12 file. (It´s protected with a password. Don´t mix up that password with the Master-Password of your Firefox Profile) Then you can copy that file to another computer/account/browser, and restore/import the PKCS#12 file again. PKCS#12 files are sometimes called *.p12 *.pkcs12 or *.pfx Microsoft usually only recognizes the .pfx extension, so you might have to rename it in case. 
+
